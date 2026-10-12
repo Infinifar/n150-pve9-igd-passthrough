@@ -1,6 +1,6 @@
 # N150 在 PVE 9.2 上直通给 Windows 10
 
-目标是让 Windows 直接使用 N150 核显和物理显示输出，同时保留虚拟显示设备用于观察。执行顺序是：**核对宿主前提 → 官方最小直通 → 收集 Code 43 证据 → 单独测试初始化 ROM → 单独调整客体 PCI 地址 → USB 和验收**。
+目标是让 Windows 直接使用 N150 核显和物理显示输出，同时保留虚拟显示设备用于观察。执行顺序是：**核对宿主前提 → 官方最小直通 → 收集 Code 43 证据 → 单独测试初始化 ROM → 单独调整客体 PCI 地址 → 显示验收**。
 
 以下 `102` 为案例 VMID。PVE 命令在宿主机以 root 执行；Windows 检查在客体管理员 PowerShell 执行。不要把示例配置文件覆盖到自己的 VM：磁盘、EFI、TPM、网络应沿用各自原配置。
 
@@ -159,33 +159,9 @@ args: -set device.hostpci0.bus=pcie.0 -set device.hostpci0.addr=0x2
 
 本案例此后 Windows 错误码 0，Intel 输出 1080p/60 Hz，用户确认物理显示恢复正常。这个结果支持在本案例保留该配置；没有证明所有花屏都由 PCI 地址造成。
 
-## 7. 无线接收器 USB 直通
+音频 `00:1f.3` 与 `00:1f.0/1f.4/1f.5` 在 group 12，本案例没有直通音频。不能把它当作独立 group 设备照搬。
 
-先找设备和物理端口：
-
-```bash
-lsusb
-lsusb -t
-for dev in /sys/bus/usb/devices/*; do
-  if [ -f "$dev/idVendor" ] && [ -f "$dev/idProduct" ]; then
-    printf '%s %s:%s\n' "${dev##*/}" "$(cat "$dev/idVendor")" "$(cat "$dev/idProduct")"
-  fi
-done
-```
-
-案例是 Logitech `046d:c534`，端口 `3-5`。关闭 VM 后：
-
-```bash
-python3 scripts/pve-n150.py usb --vmid 102 --usb-port 3-5
-python3 scripts/pve-n150.py usb --vmid 102 --usb-port 3-5 --apply
-python3 scripts/pve-n150.py start --vmid 102 --apply
-```
-
-配置为 `usb0: host=3-5`，跟随插口，换插口后需要更新。脚本限定本次验证过的接收器 ID；其他 USB 设备可按 PVE 的普通 USB 配置流程另行处理。
-
-案例的 USB 控制器 `00:14.0` 与 `00:14.2` 同组，没有整体直通控制器。音频 `00:1f.3` 与 `00:1f.0/1f.4/1f.5` 在 group 12，也没有直通。不能把这两个控制器当作独立 group 设备照搬。
-
-## 8. 内存、128 MiB 预留和最终验收
+## 7. 内存、128 MiB 预留和最终验收
 
 案例最终使用 **4 GiB 固定内存**；曾改为 6 GiB，但 16 GiB 主机上还有 8 GiB 服务 VM 和 1 GiB 路由 VM，宿主余量不足，于是改回 4 GiB并启动验证。
 
@@ -207,14 +183,11 @@ PCI 直通的 DMA 映射使动态 Balloon 回收不适用。Balloon 设备可在
 Get-CimInstance Win32_VideoController |
   Select-Object Name,Status,ConfigManagerErrorCode,DriverVersion,
                 CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate
-Get-PnpDevice -PresentOnly |
-  Where-Object { $_.InstanceId -like '*VID_046D&PID_C534*' } |
-  Select-Object Class,FriendlyName,Status
 ```
 
-验收要同时确认：Intel GPU 错误码为 0、Intel 的当前分辨率正确、物理屏幕显示稳定、键鼠可以操作，再正常关闭并启动一次复验。虚拟 VGA 与 Intel 显卡同时存在是本案例的预期结果。
+验收要同时确认：Intel GPU 错误码为 0、Intel 的当前分辨率正确、物理屏幕显示稳定，再正常关闭并启动一次复验。虚拟 VGA 与 Intel 显卡同时存在是本案例的预期结果。
 
-## 9. 失败与回滚
+## 8. 失败与回滚
 
 脚本每次变更输出 `BACKUP=/root/n150-pve-backups/VMID/...`。先正常关闭 Windows；只对本阶段的检查点回滚：
 

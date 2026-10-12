@@ -7,5 +7,3 @@ memory: 4096
 balloon: 0
 hostpci0: 0000:00:02.0,pcie=1,romfile=intel-igd-init-gen12-46d4.rom
 args: -set device.hostpci0.bus=pcie.0 -set device.hostpci0.addr=0x2
-# Replace 3-5 with the actual Logitech receiver's physical port.
-usb0: host=3-5

@@ -202,7 +202,7 @@ class Host:
             (directory / "showcmd.failed.txt").write_text(self.run("qm", "showcmd", str(vmid), "--pretty"))
             raise Refused(f"{exc}\nLogs: {directory}. No compatibility flags or forced stop were added.") from exc
 
-    def change(self, action: str, vmid: int, apply: bool, usb_port=None, memory_mib=None) -> None:
+    def change(self, action: str, vmid: int, apply: bool, memory_mib=None) -> None:
         cfg = self.preflight(vmid)
         self.stopped(vmid)
         update: dict[str, str] = {}
@@ -227,20 +227,6 @@ class Host:
             if re.search(r"bus=pcie\.0,addr=0x0?2(?:[.,'\s]|$)", self.run("qm", "showcmd", str(vmid), "--pretty")):
                 raise Refused("Guest root slot 2 appears occupied. Review the actual command before proceeding.")
             update = {"args": ROOT_ARGS}
-        elif action == "usb":
-            if not usb_port or not re.fullmatch(r"\d+-\d+(?:\.\d+)*", usb_port):
-                raise Refused("Specify a physical USB port such as --usb-port 3-5.")
-            usb = self.sys_root / "bus/usb/devices" / usb_port
-            if not usb.is_dir() or (usb / "idVendor").read_text().strip() != "046d" or (usb / "idProduct").read_text().strip() != "c534":
-                raise Refused("This port must contain the tested Logitech 046d:c534 receiver.")
-            target = f"host={usb_port}"
-            if cfg.get("usb0") not in {None, target}:
-                raise Refused("usb0 is already used by a different device; not overwritten.")
-            for conf in self.config_root.glob("*.conf"):
-                if conf.stem != str(vmid) and any(k.startswith("usb") and v.split(",", 1)[0] == target
-                                                  for k, v in parse_config(conf.read_text()).items()):
-                    raise Refused(f"USB port is assigned to VM {conf.stem}.")
-            update = {"usb0": target}
         elif action == "memory":
             if memory_mib is None or not 1024 <= memory_mib <= 65536:
                 raise Refused("Specify --memory-mib between 1024 and 65536 (tested: 4096).")
@@ -289,10 +275,9 @@ class Host:
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("action", choices=["inspect", "stage1", "rom", "root-pci", "usb", "memory", "start", "rollback"])
+    result.add_argument("action", choices=["inspect", "stage1", "rom", "root-pci", "memory", "start", "rollback"])
     result.add_argument("--vmid", type=int, required=True)
     result.add_argument("--apply", action="store_true")
-    result.add_argument("--usb-port")
     result.add_argument("--memory-mib", type=int)
     result.add_argument("--backup", type=Path)
     return result
@@ -317,7 +302,7 @@ def main() -> int:
                 raise Refused("rollback requires --backup CHECKPOINT_DIRECTORY.")
             host.rollback(args.vmid, args.backup.resolve(), args.apply)
         else:
-            host.change(args.action, args.vmid, args.apply, args.usb_port, args.memory_mib)
+            host.change(args.action, args.vmid, args.apply, memory_mib=args.memory_mib)
     except (Refused, OSError, ValueError, KeyError) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return 1

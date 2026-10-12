@@ -35,10 +35,6 @@ class FakeHost(app.Host):
         (pci / "vendor").write_text("0x8086")
         (pci / "device").write_text("0x46d4")
         (pci / "iommu_group/devices" / app.GPU).mkdir(parents=True)
-        usb = self.sys_root / "bus/usb/devices/3-5"
-        usb.mkdir(parents=True)
-        (usb / "idVendor").write_text("046d")
-        (usb / "idProduct").write_text("c534")
         self.state = "stopped"
         self.version = "11.0.3-4"
         self.driver = "vfio-pci"
@@ -132,18 +128,18 @@ class WorkflowTests(unittest.TestCase):
         self.host.change("stage1", 102, True)
         self.host.change("rom", 102, True)
         self.host.change("root-pci", 102, True)
-        self.host.change("usb", 102, True, usb_port="3-5")
+        self.host.change("memory", 102, True, memory_mib=6144)
         cfg = self.host.config(102)
         self.assertEqual(cfg["hostpci0"], app.ROM_PCI)
         self.assertEqual(cfg["args"], app.ROOT_ARGS)
-        self.assertEqual(cfg["usb0"], "host=3-5")
+        self.assertEqual(cfg["memory"], "6144")
         self.assertEqual(cfg["ide0"], app.parse_config(BASE)["ide0"])
         self.assertEqual(cfg["net0"], app.parse_config(BASE)["net0"])
         self.assertEqual(app.digest(self.host.firmware_root / app.ROM_NAME), app.ROM_SHA)
         checkpoints = self.checkpoints()
-        usb_backup = next(p.parent for p in checkpoints if json.loads(p.read_text())["action"] == "usb")
-        self.host.rollback(102, usb_backup, True)
-        self.assertNotIn("usb0", self.host.config(102))
+        memory_backup = next(p.parent for p in checkpoints if json.loads(p.read_text())["action"] == "memory")
+        self.host.rollback(102, memory_backup, True)
+        self.assertEqual(self.host.config(102)["memory"], "4096")
         self.assertEqual(self.host.config(102)["args"], app.ROOT_ARGS)
 
     def test_idempotence_creates_no_second_backup(self):
@@ -201,11 +197,6 @@ class WorkflowTests(unittest.TestCase):
         self.add_config("hostpci0: 0000:01:00.0,pcie=1\n")
         with self.assertRaisesRegex(app.Refused, "unrecognized"):
             self.host.change("stage1", 102, True)
-
-    def test_other_usb_assignment_is_not_overwritten(self):
-        self.add_config("usb0: host=2-1\n")
-        with self.assertRaisesRegex(app.Refused, "usb0 is already"):
-            self.host.change("usb", 102, True, usb_port="3-5")
 
     def test_pending_changes_are_refused(self):
         self.add_config("[PENDING]\nmemory: 6144\n")

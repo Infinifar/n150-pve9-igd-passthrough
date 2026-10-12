@@ -12,7 +12,6 @@ python3 scripts/pve-n150.py ACTION --vmid 102 [OPTIONS]
 | stage1 | 只设置最小 hostpci0；不会撤掉已有成功 ROM | `--apply` 才写入 |
 | rom | 校验并安装实测 ROM，更新 hostpci0 | `--apply` 才写入 |
 | root-pci | 用原生 `-set` 指定客体 00:02.0 | `--apply` 才写入 |
-| usb | 接收器物理插口直通 | `--usb-port 3-5`，`--apply` 才写入 |
 | memory | 修改固定内存；不改变 Balloon | `--memory-mib 4096`，`--apply` 才写入 |
 | start | 检查内存并尝试启动一次 | `--apply` 才启动 |
 | rollback | 恢复指定检查点的 before.conf | `--backup DIR`，`--apply` 才写入 |
@@ -24,8 +23,6 @@ python3 scripts/pve-n150.py ACTION --vmid 102 [OPTIONS]
 ## 拒绝覆盖的情况
 
 预检要求 PVE 9.2、QEMU 11 包文件完整、现有 OVMF/EFI 磁盘、pc-q35-11.0、虚拟显示设备、指定 N150 GPU 由 VFIO 接管且独占 group。它拒绝 pending 配置、锁定 VM、模板、其他 VM 占用 GPU、额外 hostpci、自定义 args，以及未识别的 hostpci0 参数。
-
-USB 操作拒绝覆盖已经使用的 usb0，并检查该物理端口是 `046d:c534`、未被其他 VM 的 USB 端口配置引用。若整个 USB 控制器已经直通给别的 VM，需先在主机中独立排查控制器归属；脚本不能自动解释任意控制器拓扑。
 
 `memory` 要求当前 `balloon: 0`，避免把动态最小值与固定内存混在一起。只改内存字段。`start` 检查 `MemAvailable >= 配置内存 + 256 MiB`；仍应按主机业务负载留出充足余量。
 
@@ -58,4 +55,4 @@ python3 scripts/inspect-igd-qmp.py --vmid 102 --output /root/private-igd-check
 
 QMP 脚本要求 VM 已运行、采用 q35 并存在 `hostpci0` 的 `8086:46d4` GPU。它使用 `query-pci` 和只读内存查询，不执行 register/memory 写入。`--output` 保存客体 PCI 信息，分享前需要检查内容。
 
-把 `scripts/verify-windows.ps1` 放入 Windows 后，以管理员 PowerShell 执行。输出不包含设备实例路径，查看 GPU 错误码、驱动版本、分辨率、Secure Boot 与接收器状态。结果仍需结合物理屏幕和实际键鼠操作。
+把 `scripts/verify-windows.ps1` 放入 Windows 后，以管理员 PowerShell 执行。输出不包含设备实例路径，查看 GPU 错误码、驱动版本、分辨率与 Secure Boot。结果仍需结合物理屏幕的实际显示情况。

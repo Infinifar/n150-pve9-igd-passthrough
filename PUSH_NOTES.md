@@ -10,6 +10,10 @@ The original hardware validation was performed on 2026-10-07. Publishing the
 repository does not restart or reconfigure the running PVE host/VM. Script write
 operations are tested in a simulated host; CI also checks a clean source build.
 
+This update focuses the tutorial and scripts on GPU passthrough. Peripheral
+passthrough instructions and operations have been removed. The existing PVE
+configuration is not changed by this repository update.
+
 Private SSH material, host addresses, complete VM configs, MAC/UUID identifiers,
 Windows device instance paths and raw host logs are excluded. The actual staged
 file list, ROM hash, documentation links and tests are checked before publication.

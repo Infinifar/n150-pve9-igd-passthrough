@@ -8,7 +8,4 @@ $secureBoot = try { Confirm-SecureBootUEFI } catch { $_.Exception.Message }
     Video = @(Get-CimInstance Win32_VideoController |
         Select-Object Name,Status,ConfigManagerErrorCode,DriverVersion,
                       CurrentHorizontalResolution,CurrentVerticalResolution,CurrentRefreshRate)
-    Receiver = @(Get-PnpDevice -PresentOnly |
-        Where-Object { $_.InstanceId -like '*VID_046D&PID_C534*' } |
-        Select-Object Class,FriendlyName,Status)
 } | ConvertTo-Json -Depth 5
