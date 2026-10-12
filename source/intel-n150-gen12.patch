@@ -1,0 +1,63 @@
+--- a/OvmfPkg/IgdAssignmentDxe/IgdAssignment.c
++++ b/OvmfPkg/IgdAssignmentDxe/IgdAssignment.c
+@@ -145,6 +145,22 @@
+ }
+ #endif
+ 
++// N150 (8086:46d4) uses the Gen11+ 64-bit BDSM register at 0xC0.
++// Only this explicitly matched device bypasses the historical 00:02.0 guard.
++STATIC
++BOOLEAN
++IsN150 (
++  IN EFI_PCI_IO_PROTOCOL *PciIo
++  )
++{
++  UINT16 DeviceId;
++  EFI_STATUS Status;
++  Status = PciIo->Pci.Read (PciIo, EfiPciIoWidthUint16,
++                           PCI_DEVICE_ID_OFFSET, 1, &DeviceId);
++  return !EFI_ERROR (Status) && DeviceId == 0x46D4;
++}
++
++
+ /**
+   Allocate memory in the 32-bit address space, with the requested UEFI memory
+   type and the requested alignment.
+@@ -362,10 +378,12 @@
+   UINTN                BdsmPages;
+   EFI_STATUS           Status;
+   EFI_PHYSICAL_ADDRESS Address;
++  BOOLEAN              N150;
+ 
+   if (mBdsmSize == 0) {
+     return EFI_INVALID_PARAMETER;
+   }
++  N150 = IsN150 (PciIo);
+   BdsmPages = EFI_SIZE_TO_PAGES (mBdsmSize);
+ 
+   Status = Allocate32BitAlignedPagesWithType (
+@@ -391,8 +409,8 @@
+   Status = PciIo->Pci.Write (
+                         PciIo,
+                         EfiPciIoWidthUint32,
+-                        ASSIGNED_IGD_PCI_BDSM_OFFSET,
+-                        1,                            // Count
++                        N150 ? 0xC0 : ASSIGNED_IGD_PCI_BDSM_OFFSET,
++                        N150 ? 2 : 1,                 // Two DWORDs for Gen11+
+                         &Address
+                         );
+   if (EFI_ERROR (Status)) {
+@@ -463,9 +481,10 @@
+     // Check Bus:Device.Function (Segment is ignored). This is necessary before
+     // stolen memory setup.
+     //
+-    if (PciInfo.Bus != ASSIGNED_IGD_PCI_BUS ||
+-        PciInfo.Device != ASSIGNED_IGD_PCI_DEVICE ||
+-        PciInfo.Function != ASSIGNED_IGD_PCI_FUNCTION) {
++    if (!IsN150 (PciIo) &&
++        (PciInfo.Bus != ASSIGNED_IGD_PCI_BUS ||
++         PciInfo.Device != ASSIGNED_IGD_PCI_DEVICE ||
++         PciInfo.Function != ASSIGNED_IGD_PCI_FUNCTION)) {
+       continue;
+     }
+ 

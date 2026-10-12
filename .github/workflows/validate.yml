@@ -1,0 +1,30 @@
+name: Validate scripts and build ROM
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test guarded PVE operations
+        run: python3 -m unittest discover -s tests -v
+      - name: Check documentation and archived firmware
+        run: python3 scripts/check-repository.py
+      - name: Check shell script
+        run: |
+          bash -n scripts/build-rom.sh
+          shellcheck scripts/build-rom.sh
+  build-rom:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies on CI runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends nasm uuid-dev
+      - name: Build pinned Intel initialization driver with N150 adaptation
+        run: bash scripts/build-rom.sh

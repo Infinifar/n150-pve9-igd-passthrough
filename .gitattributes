@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.rom binary
+*.sh text eol=lf
+*.py text eol=lf
+*.ps1 text eol=lf
+# Preserve upstream patch context spaces and mail signature formatting.
+*.patch text eol=lf -whitespace
